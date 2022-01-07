@@ -1,0 +1,35 @@
+# depslib dependency file v1.0
+1641573133 source:/home/user/Desktop/projects/TCP-Client/ack-packet.cpp
+	<stdint.h>
+	"ack-packet.h"
+
+1641572985 /home/user/Desktop/projects/TCP-Client/ack-packet.h
+	<stdint.h>
+
+1641583890 source:/home/user/Desktop/projects/TCP-Client/main.cpp
+	<stdio.h>
+	<stdlib.h>
+	<sys/types.h>
+	<iostream>
+	<fstream>
+	<string>
+	<cstdio>
+	<cstdlib>
+	<unistd.h>
+	<cstring>
+	<netinet/in.h>
+	<sys/socket.h>
+	<arpa/inet.h>
+	<arpa/inet.h>
+	"chrono"
+	"ack-packet.h"
+	"packet.h"
+
+1641584129 /home/user/Desktop/projects/TCP-Client/packet.h
+	<stdint.h>
+	<string>
+
+1641584130 source:/home/user/Desktop/projects/TCP-Client/packet.cpp
+	<stdint.h>
+	"packet.h"
+
