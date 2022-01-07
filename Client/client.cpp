@@ -41,51 +41,19 @@ int main()
     servaddr.sin_addr.s_addr = INADDR_ANY;
 
     int n, len;
-    int choice = 1;
-
-    sendto(sockfd, &choice, sizeof(choice),
-           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-           sizeof(servaddr));
 
     sendto(sockfd, (const char *)hello, sizeof(hello),
            MSG_CONFIRM, (const struct sockaddr *)&servaddr,
            sizeof(servaddr));
     printf("Hello message sent.\n");
 
-    choice = 1;
-
-    sendto(sockfd, &choice, sizeof(choice),
-           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-           sizeof(servaddr));
-
-    sendto(sockfd, (const char *)hello, sizeof(hello),
-           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-           sizeof(servaddr));
-
-    choice = 1;
-
-    sendto(sockfd, &choice, sizeof(choice),
-           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-           sizeof(servaddr));
-
-    sendto(sockfd, (const char *)hello, sizeof(hello),
-           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-           sizeof(servaddr));
     struct ack_packet ack2;
     ack_packet_init(&ack2, 888);
-    choice = 2;
-    sendto(sockfd, &choice, sizeof(choice),
-           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-           sizeof(servaddr));
     sendto(sockfd, (struct ack_packet *)&ack2, sizeof(ack2),
            MSG_CONFIRM, (const struct sockaddr *)&servaddr,
            sizeof(servaddr));
     struct ack_packet ack3;
     ack_packet_init(&ack3, 555);
-    choice = 2;
-    sendto(sockfd, &choice, sizeof(choice),
-           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-           sizeof(servaddr));
     sendto(sockfd, (struct ack_packet *)&ack3, sizeof(ack3),
            MSG_CONFIRM, (const struct sockaddr *)&servaddr,
            sizeof(servaddr));
