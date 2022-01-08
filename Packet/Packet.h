@@ -9,5 +9,5 @@ struct packet
 };
 
 void packet_init(struct packet *packet, int start, int end, std::string fileName, int seqNumber);
-
+void packet_end(struct packet *packet);
 // void station_load_train(struct station *station, int count);

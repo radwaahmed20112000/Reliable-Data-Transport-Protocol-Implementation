@@ -35,6 +35,7 @@ void packet_init(struct packet *packet, int start, int end, string fileName, int
   char *dataPointer = readBytes(start, end, fileName);
   strcpy(packet->data, dataPointer);
   packet->seqno = seqNumber;
+  cout << "I am counter " << seqNumber << "\n";
   packet->len = sizeof(packet);
   // cout << "The length is: " << packet->len;
   // std::cout << ("\n");
@@ -42,4 +43,8 @@ void packet_init(struct packet *packet, int start, int end, string fileName, int
   // std::cout << ("\n");
   // cout << "The size is: " << sizeof(packet->data) / sizeof(packet->data[0]);
   // std::cout << ("\n");
+}
+void packet_end(struct packet *packet)
+{
+  packet->seqno = -1;
 }

@@ -34,6 +34,12 @@ struct clientState
     int timer = 10;
     int congState = 1;
 };
+struct clientState state;
+int readyPackets = state.w;
+int duplicateAcks = 0;
+int currentProcesses = 0;
+queue<struct packet> nonAckPackets;
+pid_t c_duplicate;
 
 int getFileLength(std::string fileName)
 {
@@ -88,19 +94,14 @@ int main()
 
     // cout << "i am n " << n;
     // cout << "\n";
-    int nOfPackets = ceil(getFileLength(fileName) / 500.0);
+    int fileLength = getFileLength(fileName);
+    int nOfPackets = ceil(fileLength / 500.0);
     cout << "i am file name :";
     cout << fileName;
     cout << "\n";
-    // cout << "The packets length is: " << nOfPackets << "\n";
+    cout << "The packets length is: " << nOfPackets << "\n";
     //GLOBALS
-    struct clientState state;
-    int readyPackets = state.w;
-    int counter = 0;
-    int duplicateAcks = 0;
-    int currentProcesses = 0;
-    pid_t c_duplicate;
-    queue<struct packet> nonAckPackets;
+
     //Fork New Process
     pid_t c_pid = fork();
     // cout << "I am pid :" << c_pid << "\n";
@@ -112,9 +113,12 @@ int main()
     else if (c_pid > 0)
     {
         cout << "CHIIILLLD\n";
-        currentProcesses++;
+        currentProcesses = currentProcesses + 1;
         //TODO UPDATE : END
-        int start = 0, end = 5;
+        int start = 0, end = 500, counter = 0;
+
+        if (fileLength < end)
+            end = fileLength;
         while (counter < nOfPackets)
         { //time_out
             //Semaphore wait()
@@ -124,9 +128,16 @@ int main()
                 packet_init(&packet, start, end, fileName, counter);
                 start += 500;
                 end += 500;
-                counter++;
-                readyPackets--;
+                counter += 1;
+                readyPackets -= 1;
+                if (fileLength < end)
+                    end = fileLength;
+                cout << "aloooo " << counter << "\n";
+
                 nonAckPackets.push(packet);
+                cout << "I am seq : " << packet.seqno << "\n";
+                cout << "start " << start << "\n";
+                cout << "end " << end << "\n";
                 sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
             }
             else
@@ -149,6 +160,11 @@ int main()
                 }
             }
         }
+        cout << "END OF FILLELLEEELELLELELEL\n";
+        struct packet packet;
+        packet_end(&packet);
+        sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+
         // exit(0);
     }
     while (1)
@@ -185,7 +201,8 @@ int main()
                 }
                 state.timer = 10 * state.w;
             }
-            else if (firstPacket.seqno < ack.ackno)
+            //Delay in ack from Client
+            else if (firstPacket.seqno - ack.ackno > 1)
             {
                 while (nonAckPackets.front().seqno != ack.ackno)
                     nonAckPackets.pop();
@@ -211,7 +228,7 @@ int main()
                     }
                     else if (c_duplicate > 0)
                     {
-                        currentProcesses++;
+                        currentProcesses = currentProcesses + 1;
                         while (!copiedPackets.empty())
                         {
                             struct packet p = copiedPackets.front();
@@ -224,12 +241,18 @@ int main()
                     state.congState = 1;
                 }
                 else
-                    duplicateAcks++;
+                    duplicateAcks = duplicateAcks + 1;
             }
         }
         cout << "i am ack number " << ack.ackno;
         cout << "\n";
-
+        if (ack.ackno == nOfPackets - 1)
+        {
+            cout << "BREAK";
+            break;
+        }
         // return 0;
     }
+    close(sockfd);
+    return 0;
 }
