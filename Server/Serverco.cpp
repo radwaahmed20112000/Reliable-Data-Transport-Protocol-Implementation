@@ -91,7 +91,7 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
     if (fileLength < end)
         end = fileLength;
 
-    do
+    while (counter < nOfPackets)
     {
         //Semaphore wait()
         if (stop == false && readyPackets > 0)
@@ -111,9 +111,11 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
             cout << "start " << start << "\n";
             cout << "end " << end << "\n";
             // bool TrueFalse = (rand() % 100) < 75;
-
+            // if (counter != 2)
+            // {
             sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
             cout << "SENT\n";
+            // }
         }
         else if (stop == false)
         {
@@ -136,7 +138,7 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
                 cout << "RESET\n";
             }
         }
-    } while (counter < nOfPackets && !nonAckPackets.empty());
+    }
 }
 
 int main()
@@ -171,7 +173,7 @@ int main()
     int len, n;
 
     len = sizeof(cliaddr); //len is value/resuslt
-    cout << "server is working";
+    printf("server is working");
     cout << "\n";
     n = recvfrom(sockfd, (char *)fileName, MAXLINE, MSG_WAITALL, (struct sockaddr *)&cliaddr, (socklen_t *)&len);
 
