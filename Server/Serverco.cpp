@@ -32,15 +32,19 @@ struct clientState
 {
     int w = 1;
     int ssthresh = 64;
-    int timer = 2;
+    int timer = 5;
     int congState = 1;
 };
+//Global Variables
 struct clientState state;
 int readyPackets = state.w;
 int duplicateAcks = 0;
 int currentProcesses = 0;
 bool stop = false;
-queue<struct packet> nonAckPackets;
+int prop;
+int fileLength;
+char fileName[MAXLINE];
+queue<int> nonAckPackets;
 bool terminateThread = false;
 
 int getFileLength(std::string fileName)
@@ -60,25 +64,23 @@ int getFileLength(std::string fileName)
 void resendPackets(int sockfd, struct sockaddr_in cliaddr)
 {
     stop = true;
-    queue<struct packet> copiedPackets(nonAckPackets);
-    // c_duplicate = fork();
+    queue<int> copiedPackets(nonAckPackets);
 
-    // if (c_duplicate < 0)
-    // {
-    //     perror("fork");
-    //     exit(EXIT_FAILURE);
-    // }
-    // else if (c_duplicate > 0)
-    // {
     currentProcesses = currentProcesses + 1;
 
     while (!copiedPackets.empty())
     {
         if (terminateThread)
             std::terminate();
-        struct packet p = copiedPackets.front();
+        int seq = copiedPackets.front();
+        struct packet packet;
+        int start = seq * 500;
+        int end = start + 500;
+        if (end > fileLength)
+            end = fileLength;
+        packet_init(&packet, start, end, fileName, seq);
         copiedPackets.pop();
-        sendto(sockfd, (struct packet *)&p, sizeof(p), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
+        sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
     }
     stop = false;
 }
@@ -89,7 +91,7 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
     int start = 0, end = 500, counter = 0;
 
     if (fileLength < end)
-        end = fileLength;
+        end = fileLength - 1;
 
     while (counter < nOfPackets || !nonAckPackets.empty())
     {
@@ -103,14 +105,14 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
             counter += 1;
             readyPackets -= 1;
             if (fileLength < end)
-                end = fileLength;
-            nonAckPackets.push(packet);
+                end = fileLength - 1;
+            nonAckPackets.push(packet.seqno);
             cout << "I am seq : " << packet.seqno << "\n";
             cout << "I am ready packets : " << readyPackets << "\n";
             cout << "start " << start << "\n";
             cout << "end " << end << "\n";
-            // bool TrueFalse = (rand() % 100) < 75;
-            if (counter != 4)
+            bool TrueFalse = (rand() % 100) > prop;
+            if (TrueFalse)
             {
                 sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
                 cout << "SENT\n";
@@ -119,15 +121,15 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
         else if (stop == false)
         {
             //Time out
-            cout << "TIME OUT\n";
+            cout << "Ready Packets is zero, WAITING STATE\n";
             sleep(state.timer);
             if (readyPackets == 0)
             {
-                int seq = nonAckPackets.front().seqno;
+                int seq = nonAckPackets.front();
                 counter = seq;
                 start = seq * 500;
                 end = start + 500;
-                queue<struct packet> empty;
+                queue<int> empty;
                 swap(nonAckPackets, empty);
                 state.congState = 1;
                 state.ssthresh = state.w / 2;
@@ -138,14 +140,27 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
             }
         }
     }
-    cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAaaa\n";
 }
 
 int main()
 {
+    //reading from the file
+
+    ifstream requestFile("server.in");
+    string temp;
+
+    getline(requestFile, temp);
+    in_port_t port_number = atoi(temp.c_str());
+
+    getline(requestFile, temp);
+    unsigned int seed = atoi(temp.c_str());
+    srand(seed);
+
+    getline(requestFile, temp);
+    prop = atoi(temp.c_str());
+
     int sockfd;
     struct sockaddr_in servaddr, cliaddr;
-    char fileName[MAXLINE];
 
     // Creating socket file descriptor
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
@@ -160,7 +175,7 @@ int main()
     // Filling server information
     servaddr.sin_family = AF_INET; // IPv4
     servaddr.sin_addr.s_addr = INADDR_ANY;
-    servaddr.sin_port = htons(PORT);
+    servaddr.sin_port = htons(port_number);
 
     // Bind the socket with the server address
     if (bind(sockfd, (const struct sockaddr *)&servaddr,
@@ -179,20 +194,18 @@ int main()
 
     // cout << "i am n " << n;
     // cout << "\n";
-    int fileLength = getFileLength(fileName);
+    fileLength = getFileLength(fileName);
     int nOfPackets = ceil(fileLength / 500.0);
     cout << "i am file name :";
     cout << fileName;
     cout << "\n";
     cout << "The packets length is: " << nOfPackets << "\n";
-    //GLOBALS
 
     std::thread send_thread(sendPackets, sockfd, nOfPackets, fileLength, fileName, cliaddr);
 
     while (1)
     {
         struct ack_packet ack;
-        // sleep(3);
         n = recvfrom(sockfd, (struct ack_packet *)&ack, sizeof(ack),
                      MSG_WAITALL, (struct sockaddr *)&servaddr,
                      (socklen_t *)&len);
@@ -200,11 +213,11 @@ int main()
         if (n != 0)
         {
             // Check Duplicate Acks
-            struct packet firstPacket = nonAckPackets.front();
+            int firstPacket = nonAckPackets.front();
 
-            if (firstPacket.seqno == ack.ackno)
+            if (firstPacket == ack.ackno)
             {
-                cout << "STATE 1\n";
+                cout << "STATE 1 : Ack is sent Successfully!\n";
                 nonAckPackets.pop();
                 // Check if it was slow start
                 if (state.w >= state.ssthresh)
@@ -215,43 +228,37 @@ int main()
                 //if it is slow start
                 if (state.congState == 1)
                 {
-                    cout << "BEFORE READYPACKETS : " << readyPackets << "\n";
+                    cout << "CONGESTION AVOIDANCE\n";
                     readyPackets = state.w + readyPackets + 1;
-                    cout << "AFTER READYPACKETS : " << readyPackets << "\n";
-                    cout << "BEFORE WINDOW : " << state.w << "\n";
                     state.w = state.w * 2;
-                    cout << "AFTER WINDOW : " << state.w << "\n";
                 }
                 else
                 {
+                    cout << "SLOW START\n";
                     readyPackets = readyPackets + 2;
                     state.w = state.w + 1; //Update window size
                 }
                 state.timer = 10 * state.w;
             }
             //Delay in ack from Client
-            else if (firstPacket.seqno - ack.ackno > 1)
+            else if (firstPacket - ack.ackno > 1)
             {
-                cout << "STATE 2\n";
-                while (nonAckPackets.front().seqno != ack.ackno)
+                cout << "STATE 2: Delay in Ack from Client\n";
+                while (nonAckPackets.front() != ack.ackno)
                     nonAckPackets.pop();
             }
             else
             {
-                cout << "STATE 3\n";
+                cout << "STATE 3: Duplicate Acks\n";
                 //if 3 duplicate acks : resend from queue
                 if (duplicateAcks == 3)
                 {
-
+                    cout << "THREE DUPLICATE ACK\n";
                     duplicateAcks = 0;
                     //Check if 3 duplicate acks for the first time?
                     if (currentProcesses == 2)
                         terminateThread = true;
-                    //     kill(c_duplicate, SIGKILL);
-                    // kill(c_pid, SIGSTOP);
                     std::thread resend_thread(resendPackets, sockfd, cliaddr);
-                    // }
-                    // kill(c_pid, SIGCONT);
                     state.ssthresh = state.w / 2;
                     state.congState = 1;
                     terminateThread = false;
@@ -259,24 +266,20 @@ int main()
                 else
                 {
                     duplicateAcks += 1;
-                    cout << " I AM DUPLICAAAAAAATE " << duplicateAcks << "\n";
                 }
             }
         }
-        cout << "i am ack number " << ack.ackno;
-        cout << "\n";
+        cout << "i am ack number " << ack.ackno << "\n";
+        //Check file end
         if (ack.ackno == nOfPackets - 1)
         {
-            cout << "BREAK";
-            cout << "END OF FILLELLEEELELLELELEL\n";
+            cout << "END OF FILE\n";
             struct packet packet;
             packet_end(&packet);
-
             sendto(sockfd, (struct packet *)&packet, sizeof(packet),
                    MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
             break;
         }
-        // return 0;
     }
     close(sockfd);
     return 0;

@@ -21,10 +21,10 @@ char *readBytes(int start, int end, std::string fileName)
     // read data as a block:
     is.read(buffer, length);
 
-    // if (is)
-    //   std::cout << "all characters read successfully.\n";
-    // else
-    //   std::cout << "error: only " << is.gcount() << " could be read\n";
+    if (is)
+      std::cout << "all characters read successfully.\n";
+    else
+      std::cout << "error: only " << is.gcount() << " could be read\n";
     is.close();
   }
   return buffer;
