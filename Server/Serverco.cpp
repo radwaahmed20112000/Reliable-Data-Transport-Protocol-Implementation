@@ -91,7 +91,7 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
     if (fileLength < end)
         end = fileLength;
 
-    while (counter < nOfPackets)
+    while (counter < nOfPackets || !nonAckPackets.empty())
     {
         //Semaphore wait()
         if (stop == false && readyPackets > 0)
@@ -104,18 +104,17 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
             readyPackets -= 1;
             if (fileLength < end)
                 end = fileLength;
-            cout << "aloooo " << counter << "\n";
-
             nonAckPackets.push(packet);
             cout << "I am seq : " << packet.seqno << "\n";
+            cout << "I am ready packets : " << readyPackets << "\n";
             cout << "start " << start << "\n";
             cout << "end " << end << "\n";
             // bool TrueFalse = (rand() % 100) < 75;
-            // if (counter != 2)
-            // {
-            sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
-            cout << "SENT\n";
-            // }
+            if (counter != 4)
+            {
+                sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
+                cout << "SENT\n";
+            }
         }
         else if (stop == false)
         {
@@ -139,6 +138,7 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
             }
         }
     }
+    cout << "AAAAAAAAAAAAAAAAAAAAAAAAAAAaaa\n";
 }
 
 int main()
@@ -201,6 +201,7 @@ int main()
         {
             // Check Duplicate Acks
             struct packet firstPacket = nonAckPackets.front();
+
             if (firstPacket.seqno == ack.ackno)
             {
                 cout << "STATE 1\n";
@@ -214,8 +215,12 @@ int main()
                 //if it is slow start
                 if (state.congState == 1)
                 {
+                    cout << "BEFORE READYPACKETS : " << readyPackets << "\n";
                     readyPackets = state.w + readyPackets + 1;
+                    cout << "AFTER READYPACKETS : " << readyPackets << "\n";
+                    cout << "BEFORE WINDOW : " << state.w << "\n";
                     state.w = state.w * 2;
+                    cout << "AFTER WINDOW : " << state.w << "\n";
                 }
                 else
                 {
@@ -237,6 +242,7 @@ int main()
                 //if 3 duplicate acks : resend from queue
                 if (duplicateAcks == 3)
                 {
+
                     duplicateAcks = 0;
                     //Check if 3 duplicate acks for the first time?
                     if (currentProcesses == 2)
@@ -251,7 +257,10 @@ int main()
                     terminateThread = false;
                 }
                 else
-                    duplicateAcks = duplicateAcks + 1;
+                {
+                    duplicateAcks += 1;
+                    cout << " I AM DUPLICAAAAAAATE " << duplicateAcks << "\n";
+                }
             }
         }
         cout << "i am ack number " << ack.ackno;
