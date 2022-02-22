@@ -53,13 +53,22 @@ int getFileLength(std::string fileName)
     int length = 0;
     if (is)
     {
-        // get length of file:
         is.seekg(0, is.end);
         length = is.tellg();
         is.seekg(0, is.beg);
         is.close();
     }
     return length;
+}
+struct packet sendPacket(int seq)
+{
+    struct packet packet;
+    int start = seq * 500;
+    int end = start + 500;
+    if (end > fileLength)
+        end = fileLength;
+    packet_init(&packet, start, end, fileName, seq);
+    return packet;
 }
 void resendPackets(int sockfd, struct sockaddr_in cliaddr)
 {
@@ -73,13 +82,8 @@ void resendPackets(int sockfd, struct sockaddr_in cliaddr)
         if (terminateThread)
             std::terminate();
         int seq = copiedPackets.front();
-        struct packet packet;
-        int start = seq * 500;
-        int end = start + 500;
-        if (end > fileLength)
-            end = fileLength;
-        packet_init(&packet, start, end, fileName, seq);
         copiedPackets.pop();
+        struct packet packet = sendPacket(seq);
         sendto(sockfd, (struct packet *)&packet, sizeof(packet), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, sizeof(cliaddr));
     }
     stop = false;
@@ -88,29 +92,19 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
 {
     cout << "CHIIILLLD\n";
     currentProcesses = currentProcesses + 1;
-    int start = 0, end = 500, counter = 0;
-
-    if (fileLength < end)
-        end = fileLength - 1;
+    int counter = 0;
 
     while (counter < nOfPackets || !nonAckPackets.empty())
     {
         //Semaphore wait()
         if (stop == false && readyPackets > 0)
         {
-            struct packet packet;
-            packet_init(&packet, start, end, fileName, counter);
-            start += 500;
-            end += 500;
+            struct packet packet = sendPacket(counter);
             counter += 1;
             readyPackets -= 1;
-            if (fileLength < end)
-                end = fileLength - 1;
             nonAckPackets.push(packet.seqno);
             cout << "I am seq : " << packet.seqno << "\n";
             cout << "I am ready packets : " << readyPackets << "\n";
-            cout << "start " << start << "\n";
-            cout << "end " << end << "\n";
             bool TrueFalse = (rand() % 100) > prop;
             if (TrueFalse)
             {
@@ -127,8 +121,6 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
             {
                 int seq = nonAckPackets.front();
                 counter = seq;
-                start = seq * 500;
-                end = start + 500;
                 queue<int> empty;
                 swap(nonAckPackets, empty);
                 state.congState = 1;
@@ -139,6 +131,26 @@ void sendPackets(int sockfd, int nOfPackets, int fileLength, char fileName[], st
                 cout << "RESET\n";
             }
         }
+    }
+}
+void threeDuplicateAcksState(int sockfd, struct sockaddr_in cliaddr)
+{
+    if (duplicateAcks == 3)
+    {
+        cout << "THREE DUPLICATE ACK\n";
+        duplicateAcks = 0;
+        //Check if 3 duplicate acks for the first time?
+        if (currentProcesses == 2)
+            terminateThread = true;
+        std::thread resend_thread(resendPackets, sockfd, cliaddr);
+        state.ssthresh = state.w / 2;
+        state.w = state.w / 2;
+        state.congState = 1;
+        terminateThread = false;
+    }
+    else
+    {
+        duplicateAcks += 1;
     }
 }
 
@@ -222,10 +234,9 @@ int main()
                 // Check if it was slow start
                 if (state.w >= state.ssthresh)
                 {
-                    state.congState = 2;          //Update State Congestion Avoidance
+                    state.congState = 2;          //Update State to Congestion Avoidance
                     state.ssthresh = state.w / 2; //Update threshold
                 }
-                //if it is slow start
                 if (state.congState == 1)
                 {
                     cout << "CONGESTION AVOIDANCE\n";
@@ -251,22 +262,7 @@ int main()
             {
                 cout << "STATE 3: Duplicate Acks\n";
                 //if 3 duplicate acks : resend from queue
-                if (duplicateAcks == 3)
-                {
-                    cout << "THREE DUPLICATE ACK\n";
-                    duplicateAcks = 0;
-                    //Check if 3 duplicate acks for the first time?
-                    if (currentProcesses == 2)
-                        terminateThread = true;
-                    std::thread resend_thread(resendPackets, sockfd, cliaddr);
-                    state.ssthresh = state.w / 2;
-                    state.congState = 1;
-                    terminateThread = false;
-                }
-                else
-                {
-                    duplicateAcks += 1;
-                }
+                threeDuplicateAcksState(sockfd, cliaddr);
             }
         }
         cout << "i am ack number " << ack.ackno << "\n";
